@@ -23,10 +23,10 @@ export default function Home() {
   const PUBLIC_STREAMS = [
     "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
     "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8",
-    "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8",
+    "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8",
     "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
     "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8",
-    "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8",
+    "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8",
   ];
 
   const onReady = useCallback((videoEl) => {

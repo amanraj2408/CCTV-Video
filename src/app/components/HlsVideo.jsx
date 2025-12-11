@@ -46,6 +46,15 @@ export default function HlsVideo({ src, onReady, label }) {
         hls.on(Hls.Events.ERROR, (event, data) => {
           console.error(`${label}: HLS Error:`, data);
 
+          // Check if data is valid and has the expected properties
+          if (!data || typeof data !== 'object') {
+            console.error(`${label}: Invalid error data received:`, data);
+            setError("Stream error occurred");
+            setLoading(false);
+            hls.destroy();
+            return;
+          }
+
           if (data.fatal) {
             console.error(`${label}: Fatal error detected, attempting recovery`, {
               errorType: data.type,
@@ -66,8 +75,25 @@ export default function HlsVideo({ src, onReady, label }) {
                 break;
               default:
                 console.error(`${label}: Unrecoverable fatal error, destroying player`, data);
+                setError("Fatal stream error");
+                setLoading(false);
                 hls.destroy();
                 break;
+            }
+          } else {
+            // Handle non-fatal errors
+            console.warn(`${label}: Non-fatal HLS error:`, {
+              errorType: data.type,
+              errorDetails: data.details,
+              errorCode: data.code
+            });
+
+            // If it's a network error that's not fatal, still try to recover
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+              console.log(`${label}: Non-fatal network error, attempting recovery`);
+              setTimeout(() => {
+                hls.startLoad();
+              }, 1000);
             }
           }
         });
