@@ -1,13 +1,13 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
-import HlsVideo from "./components/HlsVideo";
+import HlsVideo from "../app/components/HlsVideo";
 
 export default function Home() {
   const videosRef = useRef([]);
   const [ready, setReady] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [usePublicStreams, setUsePublicStreams] = useState(true); // Set to true by default
   const [baseUrl, setBaseUrl] = useState("http://localhost:8888");
 
   const CAMS = [
@@ -17,6 +17,16 @@ export default function Home() {
     { id: "cam4", label: "Camera 4" },
     { id: "cam5", label: "Camera 5" },
     { id: "cam6", label: "Camera 6" },
+  ];
+
+  // Public HLS streams for demo/testing
+  const PUBLIC_STREAMS = [
+    "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+    "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8",
+    "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8",
+    "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+    "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8",
+    "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8",
   ];
 
   const onReady = useCallback((videoEl) => {
@@ -33,62 +43,40 @@ export default function Home() {
     }
 
     try {
-      console.log("Starting all videos together");
       const times = videosRef.current.map(v => v.currentTime || 0);
       const minTime = Math.min(...times);
 
-      videosRef.current.forEach((v, index) => {
+      videosRef.current.forEach(v => {
         try {
           v.currentTime = minTime;
-          console.log(`Video ${index + 1} time set to: ${minTime}`);
         } catch (e) {
-          console.error(`Error setting time for video ${index + 1}:`, e);
+          console.error("Error setting time:", e);
         }
       });
 
       await Promise.all(
-        videosRef.current.map((v, index) =>
-          v.play().then(() => console.log(`Video ${index + 1} started playing`)).catch(err => {
-            console.error(`Play error for video ${index + 1}:`, err);
-            return Promise.reject(err);
-          })
+        videosRef.current.map(v => 
+          v.play().catch(err => console.error("Play error:", err))
         )
       );
 
       setIsPlaying(true);
-      console.log("All videos started successfully");
     } catch (error) {
       console.error("Error starting videos:", error);
-      alert("Failed to start some videos. Check console for details.");
     }
   };
 
   const stopAll = () => {
-    console.log("Stopping all videos");
-    videosRef.current.forEach((v, index) => {
-      v.pause();
-      console.log(`Video ${index + 1} stopped`);
-    });
+    videosRef.current.forEach(v => v.pause());
     setIsPlaying(false);
-    console.log("All videos stopped");
   };
 
   const muteAll = () => {
-    console.log("Muting all videos");
-    videosRef.current.forEach((v, index) => {
-      v.muted = true;
-      console.log(`Video ${index + 1} muted`);
-    });
-    setIsMuted(true);
+    videosRef.current.forEach(v => v.muted = true);
   };
 
   const unmuteAll = () => {
-    console.log("Unmuting all videos");
-    videosRef.current.forEach((v, index) => {
-      v.muted = false;
-      console.log(`Video ${index + 1} unmuted`);
-    });
-    setIsMuted(false);
+    videosRef.current.forEach(v => v.muted = false);
   };
 
   return (
@@ -98,7 +86,7 @@ export default function Home() {
           <h1 className="text-4xl font-bold mb-2 bg-linear-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
             Multi-Stream Video Dashboard
           </h1>
-          <p className="text-gray-400">Synchronized HLS streaming from RTSP source</p>
+          <p className="text-gray-400">Synchronized HLS streaming demonstration</p>
         </div>
 
         <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-6 mb-8 shadow-xl border border-gray-700">
@@ -125,23 +113,13 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <button
                 onClick={muteAll}
-                disabled={isMuted}
-                className={`px-4 py-2.5 rounded-lg font-medium transition-all ${
-                  isMuted
-                    ? 'bg-red-600 cursor-not-allowed'
-                    : 'bg-gray-700 hover:bg-gray-600'
-                }`}
+                className="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-all"
               >
                 🔇 Mute All
               </button>
               <button
                 onClick={unmuteAll}
-                disabled={!isMuted}
-                className={`px-4 py-2.5 rounded-lg font-medium transition-all ${
-                  !isMuted
-                    ? 'bg-green-600 cursor-not-allowed'
-                    : 'bg-gray-700 hover:bg-gray-600'
-                }`}
+                className="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-all"
               >
                 🔊 Unmute All
               </button>
@@ -157,24 +135,53 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mt-4 flex items-center gap-3">
-            <label className="text-sm font-medium text-gray-300">MediaMTX Server:</label>
-            <input
-              type="text"
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder="http://localhost:8888"
-              className="flex-1 max-w-md px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-            />
-            <span className="text-xs text-gray-400">Change if MediaMTX runs on different port/host</span>
+          <div className="mt-4 flex items-center gap-3 flex-wrap">
+            <label className="text-sm font-medium text-gray-300">Stream Source:</label>
+            <button
+              onClick={() => {
+                setUsePublicStreams(false);
+                setReady(0);
+                videosRef.current = [];
+              }}
+              className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                !usePublicStreams
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              MediaMTX (localhost:8888)
+            </button>
+            <button
+              onClick={() => {
+                setUsePublicStreams(true);
+                setReady(0);
+                videosRef.current = [];
+              }}
+              className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                usePublicStreams
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              Public Demo Streams
+            </button>
+            {!usePublicStreams && (
+              <input
+                type="text"
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                placeholder="http://localhost:8888"
+                className="flex-1 max-w-xs px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            )}
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {CAMS.map((cam) => (
+          {CAMS.map((cam, index) => (
             <HlsVideo
-              key={cam.id}
-              src={`${baseUrl}/${cam.id}/index.m3u8`}
+              key={`${cam.id}-${usePublicStreams}`}
+              src={usePublicStreams ? PUBLIC_STREAMS[index] : `${baseUrl}/${cam.id}/index.m3u8`}
               onReady={onReady}
               label={cam.label}
             />
@@ -186,7 +193,7 @@ export default function Home() {
           <ol className="space-y-2 text-sm text-gray-300">
             <li className="flex items-start gap-2">
               <span className="font-bold text-blue-400">1.</span>
-              <span>Make sure MediaMTX is running with the configured RTSP sources</span>
+              <span>Click "Public Demo Streams" to use working HLS streams instantly</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="font-bold text-blue-400">2.</span>
@@ -198,7 +205,7 @@ export default function Home() {
             </li>
             <li className="flex items-start gap-2">
               <span className="font-bold text-blue-400">4.</span>
-              <span>Use control buttons to manage playback across all streams</span>
+              <span>Switch to "MediaMTX" mode when you have local streams configured</span>
             </li>
           </ol>
         </div>
