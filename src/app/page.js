@@ -10,10 +10,10 @@ export default function Home() {
   const [usePublicStreams, setUsePublicStreams] = useState(true);
   const [baseUrl, setBaseUrl] = useState("http://localhost:8888");
   const [stats, setStats] = useState({
-    activeCameras: 2,
-    totalCameras: 2,
+    activeCameras: 4,
+    totalCameras: 4,
     activeAlerts: 1,
-    camerasOnline: 2,
+    camerasOnline: 4,
     camerasOffline: 0,
     totalViolations: 0,
     aiProcessed: 0,
