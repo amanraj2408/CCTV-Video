@@ -29,6 +29,8 @@ export default function Home() {
     { id: "cam6", label: "Camera 6" },
   ];
 
+  const displayedCams = CAMS.slice(0, 4);
+
   // Public HLS streams for demo/testing
   const PUBLIC_STREAMS = [
     "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
@@ -47,26 +49,29 @@ export default function Home() {
   }, []);
 
   const startTogether = async () => {
-    if (videosRef.current.length < CAMS.length) {
+    const vids = videosRef.current.filter(Boolean);
+    if (vids.length < displayedCams.length) {
       alert("Please wait for all streams to load");
       return;
     }
 
     try {
-      const times = videosRef.current.map(v => v.currentTime || 0);
+      const times = vids.map(v => v.currentTime || 0);
       const minTime = Math.min(...times);
 
-      videosRef.current.forEach(v => {
+      vids.forEach(v => {
         try {
           v.currentTime = minTime;
         } catch (e) {
-          console.error("Error setting time:", e);
+          console.debug("Could not set currentTime on a stream (likely live):", e);
         }
       });
 
       await Promise.all(
-        videosRef.current.map(v => 
-          v.play().catch(err => console.error("Play error:", err))
+        vids.map(v =>
+          (v.play && v.play())?.catch
+            ? v.play().catch(err => console.error("Play error:", err))
+            : Promise.resolve()
         )
       );
 
@@ -77,16 +82,22 @@ export default function Home() {
   };
 
   const stopAll = () => {
-    videosRef.current.forEach(v => v.pause());
+    videosRef.current.filter(Boolean).forEach(v => {
+      try { v.pause(); } catch (e) { console.error('Pause failed', e); }
+    });
     setIsPlaying(false);
   };
 
   const muteAll = () => {
-    videosRef.current.forEach(v => v.muted = true);
+    videosRef.current.filter(Boolean).forEach(v => {
+      try { v.muted = true; } catch (e) { console.error('Mute failed', e); }
+    });
   };
 
   const unmuteAll = () => {
-    videosRef.current.forEach(v => v.muted = false);
+    videosRef.current.filter(Boolean).forEach(v => {
+      try { v.muted = false; } catch (e) { console.error('Unmute failed', e); }
+    });
   };
 
   return (
@@ -168,7 +179,7 @@ export default function Home() {
         <div className="flex gap-4 mb-8 flex-wrap">
           <button
             onClick={startTogether}
-            disabled={ready < CAMS.length || isPlaying}
+              disabled={ready < displayedCams.length || isPlaying}
             className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-all flex items-center gap-2 shadow-lg"
           >
             <span>🎛️</span> Disable Priority
@@ -188,7 +199,7 @@ export default function Home() {
         {/* CCTV Monitoring Wall Title */}
         <div className="mb-4">
           <h2 className="text-2xl font-bold mb-2">CCTV Monitoring Wall</h2>
-          <p className="text-gray-400 text-sm">Managing {ready}/{CAMS.length} cameras • 3 concurrent live slots</p>
+          <p className="text-gray-400 text-sm">Managing {ready}/{displayedCams.length} cameras • 3 concurrent live slots</p>
         </div>
 
         {/* Statistics Grid */}
@@ -255,11 +266,38 @@ export default function Home() {
               className="flex-1 min-w-xs px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             />
           )}
+          <div className="ml-auto flex gap-2">
+            <button
+              onClick={startTogether}
+              disabled={ready < displayedCams.length}
+              className="px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium text-sm"
+            >
+              ▶️ Start All
+            </button>
+            <button
+              onClick={stopAll}
+              className="px-3 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium text-sm"
+            >
+              ⏸️ Stop All
+            </button>
+            <button
+              onClick={muteAll}
+              className="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg font-medium text-sm"
+            >
+              🔇 Mute All
+            </button>
+            <button
+              onClick={unmuteAll}
+              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium text-sm"
+            >
+              🔊 Unmute All
+            </button>
+          </div>
         </div>
 
         {/* Camera Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {CAMS.slice(0, 4).map((cam, index) => (
+          {displayedCams.map((cam, index) => (
             <HlsVideo
               key={`${cam.id}-${usePublicStreams}`}
               src={usePublicStreams ? PUBLIC_STREAMS[index] : `${baseUrl}/${cam.id}/index.m3u8`}

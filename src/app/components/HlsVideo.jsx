@@ -81,7 +81,28 @@ export default function HlsVideo({ src, onReady, label, autoplay = false, hlsCon
           const errorType = data?.type || 'UNKNOWN';
           const errorDetails = data?.details || 'No error details available';
           const isFatal = data?.fatal || false;
-          
+
+          // Special-case: bufferSeekOverHole (seeking past a missing buffer segment in live streams)
+          if (data?.details === 'bufferSeekOverHole') {
+            console.warn(`${label}: HLS bufferSeekOverHole — attempting to jump to buffered end or restart load.`);
+            try {
+              const buffered = video.buffered;
+              if (buffered && buffered.length) {
+                const end = buffered.end(buffered.length - 1);
+                // jump slightly before end to avoid immediately falling into hole again
+                video.currentTime = Math.max(0, end - 0.5);
+              } else if (hlsRef.current) {
+                // try restarting load at live
+                hlsRef.current.startLoad();
+              }
+              setError(null);
+              setLoading(false);
+            } catch (e) {
+              console.error(`${label}: Failed handling bufferSeekOverHole`, e);
+            }
+            return;
+          }
+
           console.error(`${label}: HLS Error [${errorType}]:`, errorDetails);
 
           // Check if data is valid and has the expected properties
