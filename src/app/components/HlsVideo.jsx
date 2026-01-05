@@ -1,102 +1,171 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
+import PropTypes from "prop-types";
 import Hls from "hls.js";
 
-export default function HlsVideo({ src, onReady, label }) {
+export default function HlsVideo({ src, onReady, label, autoplay = false, hlsConfig = {} }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const defaultHlsConfig = {
+    liveSyncDuration: 2,
+    backBufferLength: 0,
+    maxBufferLength: 10,
+    maxMaxBufferLength: 20,
+    enableWorker: true,
+    lowLatencyMode: true,
+    debug: false,
+  };
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     let hls;
+    let usingNative = false;
 
     const initPlayer = () => {
       setError(null);
       setLoading(true);
-      if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = src;
-      } else if (Hls.isSupported()) {
-        hls = new Hls({
-          liveSyncDuration: 2,
-          backBufferLength: 0,
-          maxBufferLength: 10,
-          maxMaxBufferLength: 20,
-          enableWorker: true,
-          lowLatencyMode: true,
-        });
-        
-        hls.loadSource(src);
-        hls.attachMedia(video);
-        hlsRef.current = hls;
+      
+      // Validate URL
+      if (!src) {
+        setError("No stream URL provided");
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        if (video.canPlayType("application/vnd.apple.mpegurl")) {
+          usingNative = true;
+          video.src = src;
+          console.log(`${label}: Using native HLS playback`);
+          if (autoplay) {
+            video.play().catch((e) => {
+              console.warn(`${label}: Autoplay prevented or failed:`, e);
+            });
+          }
+        } else if (Hls.isSupported()) {
+          const combinedConfig = { ...defaultHlsConfig, ...hlsConfig };
+          hls = new Hls(combinedConfig);
+          
+          console.log(`${label}: Loading stream from ${src.substring(0, 50)}...`);
+          hls.loadSource(src);
+          hls.attachMedia(video);
+          hlsRef.current = hls;
 
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          console.log(`${label}: HLS manifest loaded`);
-          setLoading(false);
-        });
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            console.log(`${label}: HLS manifest loaded successfully`);
+            setLoading(false);
+            setError(null);
+            if (autoplay) {
+              // Try to start playback when manifest parsed
+              try {
+                video.play().catch((e) => {
+                  console.warn(`${label}: Autoplay prevented or failed:`, e);
+                });
+              } catch (e) {
+                console.warn(`${label}: Autoplay attempt failed:`, e);
+              }
+            }
+          });
 
-        hls.on(Hls.Events.BUFFER_APPENDED, () => {
-          setLoading(false);
-        });
+          hls.on(Hls.Events.BUFFER_APPENDED, () => {
+            setLoading(false);
+          });
 
-        hls.on(Hls.Events.ERROR, (event, data) => {
-          console.error(`${label}: HLS Error:`, data);
+          hls.on(Hls.Events.ERROR, (event, data) => {
+          const errorType = data?.type || 'UNKNOWN';
+          const errorDetails = data?.details || 'No error details available';
+          const isFatal = data?.fatal || false;
+          
+          console.error(`${label}: HLS Error [${errorType}]:`, errorDetails);
 
           // Check if data is valid and has the expected properties
           if (!data || typeof data !== 'object') {
-            console.error(`${label}: Invalid error data received:`, data);
-            setError("Stream error occurred");
-            setLoading(false);
-            hls.destroy();
+            console.error(`${label}: Invalid error data structure, retrying stream...`);
+            setError("Stream connection issue - retrying...");
+            setTimeout(() => {
+              if (hlsRef.current) {
+                hlsRef.current.startLoad();
+              }
+            }, 2000);
             return;
           }
 
-          if (data.fatal) {
+          if (isFatal) {
             console.error(`${label}: Fatal error detected, attempting recovery`, {
-              errorType: data.type,
-              errorDetails: data.details,
-              errorCode: data.code
+              errorType: errorType,
+              errorDetails: errorDetails,
+              errorCode: data?.code
             });
 
-            switch (data.type) {
+            switch (errorType) {
               case Hls.ErrorTypes.NETWORK_ERROR:
-                console.log(`${label}: Network error detected, restarting load`);
+              case 'networkError':
+                console.log(`${label}: Network error detected, restarting load...`);
+                setError("Network error - reconnecting...");
                 setTimeout(() => {
-                  hls.startLoad();
-                }, 1000);
+                  if (hlsRef.current) {
+                    hlsRef.current.startLoad();
+                  }
+                }, 2000);
                 break;
               case Hls.ErrorTypes.MEDIA_ERROR:
-                console.log(`${label}: Media error detected, attempting recovery`);
-                hls.recoverMediaError();
+              case 'mediaError':
+                console.log(`${label}: Media error detected, attempting recovery...`);
+                setError("Media playback issue - recovering...");
+                try {
+                  if (hlsRef.current) {
+                    hlsRef.current.recoverMediaError();
+                  }
+                } catch (e) {
+                  console.error(`${label}: Recovery failed`, e);
+                  setError("Cannot recover stream");
+                  setLoading(false);
+                  if (hlsRef.current) {
+                    hlsRef.current.destroy();
+                  }
+                }
                 break;
               default:
-                console.error(`${label}: Unrecoverable fatal error, destroying player`, data);
-                setError("Fatal stream error");
+                console.error(`${label}: Unrecoverable error type: ${errorType}`, data);
+                setError(`Stream error: ${errorType}`);
                 setLoading(false);
-                hls.destroy();
+                setTimeout(() => {
+                  if (hlsRef.current) {
+                    hlsRef.current.destroy();
+                  }
+                }, 1000);
                 break;
             }
           } else {
             // Handle non-fatal errors
-            console.warn(`${label}: Non-fatal HLS error:`, {
-              errorType: data.type,
-              errorDetails: data.details,
-              errorCode: data.code
+            console.warn(`${label}: Non-fatal HLS error [${errorType}]:`, {
+              errorType: errorType,
+              errorDetails: errorDetails,
+              errorCode: data?.code
             });
 
             // If it's a network error that's not fatal, still try to recover
-            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-              console.log(`${label}: Non-fatal network error, attempting recovery`);
+            if (errorType === Hls.ErrorTypes.NETWORK_ERROR || errorType === 'networkError') {
+              console.log(`${label}: Non-fatal network error, retrying...`);
               setTimeout(() => {
-                hls.startLoad();
-              }, 1000);
+                if (hlsRef.current) {
+                  hlsRef.current.startLoad();
+                }
+              }, 1500);
             }
           }
         });
+        }
+      } catch (e) {
+        console.error(`${label}: Failed to initialize player:`, e);
+        setError("Failed to initialize video player");
+        setLoading(false);
       }
     };
 
@@ -134,8 +203,28 @@ export default function HlsVideo({ src, onReady, label }) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
+      // If native playback was used, clear src to free network resources
+      if (usingNative) {
+        try {
+          video.pause();
+        } catch (e) {
+          /* ignore */
+        }
+        try {
+          video.removeAttribute('src');
+        } catch (e) {
+          /* ignore */
+        }
+        try {
+          video.src = '';
+          video.load();
+        } catch (e) {
+          /* ignore */
+        }
+      }
     };
-  }, [src, onReady, label]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src]);
 
   return (
     <div className="relative bg-black rounded-lg overflow-hidden shadow-lg">
@@ -170,3 +259,38 @@ export default function HlsVideo({ src, onReady, label }) {
     </div>
   );
 }
+
+HlsVideo.propTypes = {
+  /**
+   * HLS stream URL (m3u8 format).
+   * Required for playback to start.
+   */
+  src: PropTypes.string.isRequired,
+
+  /**
+   * Callback fired when video metadata is loaded and ready to play.
+   * Receives the video HTMLElement as argument.
+   */
+  onReady: PropTypes.func,
+
+  /**
+   * Label displayed in the top-left corner of the video overlay.
+   * Used for logging and UI identification.
+   */
+  label: PropTypes.string,
+
+  /**
+   * If true, attempts to autoplay the stream when ready.
+   * Note: Modern browsers may block autoplay without user gesture or mute.
+   * Default: false
+   */
+  autoplay: PropTypes.bool,
+
+  /**
+   * Custom Hls.js configuration options.
+   * Merged with default config (liveSyncDuration, lowLatencyMode, etc.).
+   * Example: { maxBufferLength: 15, lowLatencyMode: false }
+   * See https://github.com/video-dev/hls.js/blob/master/docs/API.md#fine-tuning
+   */
+  hlsConfig: PropTypes.object,
+};
