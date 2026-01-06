@@ -11,13 +11,17 @@ export default function HlsVideo({ src, onReady, label, autoplay = false, hlsCon
   const [loading, setLoading] = useState(true);
 
   const defaultHlsConfig = {
-    liveSyncDuration: 2,
+    liveSyncDuration: 3,
     backBufferLength: 0,
-    maxBufferLength: 10,
-    maxMaxBufferLength: 20,
+    maxBufferLength: 20,
+    maxMaxBufferLength: 30,
     enableWorker: true,
-    lowLatencyMode: true,
+    lowLatencyMode: false,
     debug: false,
+    startLevel: -1,
+    autoStartLoad: true,
+    nudgeOffset: 0.15,
+    nudgeMaxRetry: 3,
   };
 
   useEffect(() => {
