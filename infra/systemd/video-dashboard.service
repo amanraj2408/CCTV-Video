@@ -1,0 +1,18 @@
+[Unit]
+Description=video-dashboard Next.js app
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/app
+Environment=PORT=3000
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=video-dashboard
+
+[Install]
+WantedBy=multi-user.target
