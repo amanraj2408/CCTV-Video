@@ -11,17 +11,24 @@ export default function HlsVideo({ src, onReady, label, autoplay = false, hlsCon
   const [loading, setLoading] = useState(true);
 
   const defaultHlsConfig = {
-    liveSyncDuration: 3,
-    backBufferLength: 0,
-    maxBufferLength: 20,
-    maxMaxBufferLength: 30,
+    liveSyncDuration: 2,
+    backBufferLength: 5,
+    maxBufferLength: 15,
+    maxMaxBufferLength: 25,
     enableWorker: true,
-    lowLatencyMode: false,
+    lowLatencyMode: true,
     debug: false,
-    startLevel: -1,
+    startLevel: 0,
     autoStartLoad: true,
     nudgeOffset: 0.15,
-    nudgeMaxRetry: 3,
+    nudgeMaxRetry: 5,
+    maxFragLookUpTolerance: 0.5,
+    fragLoadingTimeOut: 20000,
+    manifestLoadingTimeOut: 10000,
+    levelLoadingTimeOut: 10000,
+    testOnFailure: true,
+    progressive: true,
+    networkTimeoutMs: 4000,
   };
 
   useEffect(() => {
@@ -63,22 +70,36 @@ export default function HlsVideo({ src, onReady, label, autoplay = false, hlsCon
 
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
             console.log(`${label}: HLS manifest loaded successfully`);
+            // Set a small initial delay to ensure proper buffering before starting
             setLoading(false);
             setError(null);
-            if (autoplay) {
-              // Try to start playback when manifest parsed
-              try {
-                video.play().catch((e) => {
-                  console.warn(`${label}: Autoplay prevented or failed:`, e);
-                });
-              } catch (e) {
-                console.warn(`${label}: Autoplay attempt failed:`, e);
-              }
+            if (onReady) {
+              setTimeout(() => onReady(video), 100);
             }
           });
 
           hls.on(Hls.Events.BUFFER_APPENDED, () => {
             setLoading(false);
+            // Ensure stable playback by preventing extreme buffering variations
+            if (video && !video.paused) {
+              const buffered = video.buffered;
+              if (buffered.length > 0) {
+                const bufferedEnd = buffered.end(buffered.length - 1);
+                const currentTime = video.currentTime;
+                const bufferedAmount = bufferedEnd - currentTime;
+                
+                // If we have too much buffer ahead, slow down load
+                if (bufferedAmount > 10 && hls.manualLevel !== -1) {
+                  const levels = hls.levels;
+                  if (levels && levels.length > 0) {
+                    const currentLevel = hls.currentLevel;
+                    if (currentLevel > 0 && bufferedAmount > 15) {
+                      hls.currentLevel = currentLevel - 1;
+                    }
+                  }
+                }
+              }
+            }
           });
 
           hls.on(Hls.Events.ERROR, (event, data) => {

@@ -56,26 +56,78 @@ export default function Home() {
     }
 
     try {
-      const times = vids.map(v => v.currentTime || 0);
-      const minTime = Math.min(...times);
-
-      vids.forEach(v => {
+      // Get a common sync point for all videos
+      const syncPoint = Date.now();
+      
+      // For live streams, ensure they're all at the same temporal position
+      // by pausing, seeking to same position, then playing together
+      const playPromises = [];
+      
+      vids.forEach((v) => {
         try {
-          v.currentTime = minTime;
+          // Pause all first
+          v.pause();
+          // Try to sync to same playback position (works for VOD, ignored for live)
+          try {
+            const duration = v.duration;
+            if (duration && isFinite(duration)) {
+              v.currentTime = 0;
+            }
+          } catch (e) {
+            console.debug("Could not set currentTime (likely live stream):", e);
+          }
         } catch (e) {
-          console.debug("Could not set currentTime on a stream (likely live):", e);
+          console.debug("Pause failed:", e);
         }
       });
 
-      await Promise.all(
-        vids.map(v =>
-          (v.play && v.play())?.catch
-            ? v.play().catch(err => console.error("Play error:", err))
-            : Promise.resolve()
-        )
-      );
+      // Small delay to ensure all are paused and synced
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Play all at approximately the same time
+      vids.forEach((v) => {
+        if (v.play) {
+          playPromises.push(
+            v.play()
+              .catch(err => console.error("Play error:", err))
+          );
+        }
+      });
+
+      await Promise.all(playPromises);
+
+      // Monitor and maintain sync
+      const syncInterval = setInterval(() => {
+        if (!isPlaying) {
+          clearInterval(syncInterval);
+          return;
+        }
+
+        const activVids = vids.filter(v => !v.paused);
+        if (activVids.length >= 2) {
+          const times = activVids.map(v => v.currentTime);
+          const maxTime = Math.max(...times);
+          const minTime = Math.min(...times);
+          const drift = maxTime - minTime;
+
+          // If drift exceeds 500ms, resync
+          if (drift > 0.5) {
+            console.warn(`Video sync drift detected: ${(drift * 1000).toFixed(0)}ms, resyncing...`);
+            activVids.forEach(v => {
+              try {
+                if (Math.abs(v.currentTime - minTime) > 0.2) {
+                  v.currentTime = minTime;
+                }
+              } catch (e) {
+                console.debug("Resync failed:", e);
+              }
+            });
+          }
+        }
+      }, 1000);
 
       setIsPlaying(true);
+      return () => clearInterval(syncInterval);
     } catch (error) {
       console.error("Error starting videos:", error);
     }
