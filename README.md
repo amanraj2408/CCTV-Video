@@ -1,33 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# 🎥 Video Dashboard - Professional Camera Management System
 
-## Getting Started
+A modern, scalable video surveillance and camera management platform built with **Next.js**, **MongoDB**, **Clerk Authentication**, and **MQTT** for real-time feed management.
 
-First, run the development server:
+## ✨ Key Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **🎬 Multi-Camera Management** - Add and manage multiple camera feeds
+- **📊 Real-time Monitoring** - Live dashboard with system metrics
+- **🚨 Alert System** - Configurable alerts for events
+- **🔌 MQTT Integration** - Real-time bidirectional communication
+- **🔐 Secure Authentication** - Clerk-powered user management
+- **💾 MongoDB Database** - Scalable document storage
+- **📱 Responsive UI** - Works on all devices
+- **🐳 Docker Ready** - Easy deployment
+
+## 🚀 Quick Start
+
+### Option 1: Automated Setup (Windows)
+```batch
+setup.bat
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Option 2: Automated Setup (macOS/Linux)
+```bash
+chmod +x setup.sh
+./setup.sh
+```
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+### Option 3: Manual Setup
+1. `npm install`
+2. `cp .env.example .env.local`
+3. Edit `.env.local` with your settings
+4. `npm run dev` (terminal 1)
+5. `npm run mqtt-server` (terminal 2)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000)
 
-## Learn More
+## 📚 Documentation
 
-To learn more about Next.js, take a look at the following resources:
+- **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Comprehensive setup guide
+- **[API Documentation](#api)** - REST API endpoints
+- **[Configuration](#configuration)** - Environment setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🔧 Configuration
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Copy `.env.example` to `.env.local` and configure:
+
+```env
+MONGODB_URI=mongodb+srv://...
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+MQTT_BROKER_URL=mqtt://localhost:1883
+```
+
+## 📦 What's Included
+
+✅ MongoDB integration for data persistence
+✅ Clerk authentication for secure user management
+✅ MQTT client for real-time camera feeds
+✅ API routes for camera CRUD operations
+✅ Real-time monitoring dashboard
+✅ Alert management system
+✅ Responsive Tailwind CSS UI
+✅ Docker Compose setup
+✅ Production-ready configuration
+
+## 🚢 Deployment
+
+See [SETUP_GUIDE.md](SETUP_GUIDE.md) for deployment instructions.
+
+## 📞 Support
+
+For issues and questions, refer to [SETUP_GUIDE.md](SETUP_GUIDE.md) troubleshooting section.
 
 ## Deploy on Vercel
 

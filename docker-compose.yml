@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: video-dashboard-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:-password}
+      MONGO_INITDB_DATABASE: video-dashboard
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - video-dashboard-network
+
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: video-dashboard-mqtt
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_logs:/mosquitto/log
+    networks:
+      - video-dashboard-network
+    depends_on:
+      - mongodb
+
+  redis:
+    image: redis:alpine
+    container_name: video-dashboard-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - video-dashboard-network
+
+volumes:
+  mongo_data:
+  mosquitto_data:
+  mosquitto_logs:
+  redis_data:
+
+networks:
+  video-dashboard-network:
+    driver: bridge
